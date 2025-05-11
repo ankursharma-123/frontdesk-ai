@@ -1,0 +1,586 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Frontdesk AI Supervisor</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/css/bootstrap.min.css">
+    <style>
+        /* Main styles for Frontdesk AI Supervisor */
+
+        .request-card {
+            margin-bottom: 1rem;
+            transition: all 0.3s ease;
+        }
+
+        .request-card:hover {
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+        }
+
+        .request-card .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .request-status {
+            font-size: 0.85rem;
+            padding: 0.25rem 0.5rem;
+            border-radius: 0.25rem;
+        }
+
+        .status-pending {
+            background-color: #fff3cd;
+            color: #856404;
+        }
+
+        .status-resolved {
+            background-color: #d4edda;
+            color: #155724;
+        }
+
+        .status-unresolved {
+            background-color: #f8d7da;
+            color: #721c24;
+        }
+
+        .request-time {
+            font-size: 0.85rem;
+            color: #6c757d;
+        }
+
+        .knowledge-item {
+            margin-bottom: 1.5rem;
+            border-left: 4px solid #0d6efd;
+            padding-left: 1rem;
+        }
+
+        .knowledge-item .question {
+            font-weight: 600;
+            font-size: 1.1rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .knowledge-item .answer {
+            color: #495057;
+        }
+
+        .knowledge-item .metadata {
+            font-size: 0.85rem;
+            color: #6c757d;
+            margin-top: 0.5rem;
+        }
+
+        .nav-tabs .nav-link {
+            cursor: pointer;
+        }
+
+        #requests-list,
+        #knowledge-list {
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+    </style>
+</head>
+
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+        <div class="container">
+            <a class="navbar-brand" href="/">Frontdesk AI Supervisor</a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav">
+                    <li class="nav-item">
+                        <a class="nav-link active" href="/">Help Requests</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/knowledge">Knowledge Base</a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container mt-4">
+        <div class="row mb-4">
+            <div class="col">
+                <h1>Help Requests</h1>
+            </div>
+            <div class="col-auto">
+                <button class="btn btn-primary" id="simulate-call-btn">Simulate Call</button>
+            </div>
+        </div>
+
+        <div class="row mb-4">
+            <div class="col">
+                <ul class="nav nav-tabs" id="requestTabs">
+                    <li class="nav-item">
+                        <a class="nav-link active" data-status="pending" href="#">Pending</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" data-status="resolved" href="#">Resolved</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" data-status="unresolved" href="#">Unresolved</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" data-status="all" href="#">All</a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="col">
+                <div id="requests-container">
+                    <div class="text-center py-5" id="loading">
+                        <div class="spinner-border" role="status">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                    </div>
+                    <div id="no-requests" class="alert alert-info" style="display: none;">
+                        No help requests found.
+                    </div>
+                    <div id="requests-list"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal for simulating a call -->
+    <div class="modal fade" id="simulateCallModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Simulate Customer Call</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="simulate-call-form">
+                        <div class="mb-3">
+                            <label for="phone" class="form-label">Customer Phone</label>
+                            <input type="text" class="form-control" id="phone" value="1234567890">
+                        </div>
+                        <div class="mb-3">
+                            <label for="question" class="form-label">Question</label>
+                            <textarea class="form-control" id="question"
+                                rows="3">Do you offer hair coloring services?</textarea>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-body" id="simulation-result" style="display: none;">
+                    <div class="alert alert-info" id="simulation-message"></div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                    <button type="button" class="btn btn-primary" id="submit-simulation">Simulate</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal for resolving a request -->
+    <div class="modal fade" id="resolveRequestModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Resolve Help Request</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <p><strong>Customer Phone:</strong> <span id="resolve-phone"></span></p>
+                        <p><strong>Question:</strong> <span id="resolve-question"></span></p>
+                    </div>
+                    <form id="resolve-form">
+                        <input type="hidden" id="resolve-request-id">
+                        <div class="mb-3">
+                            <label for="answer" class="form-label">Answer</label>
+                            <textarea class="form-control" id="answer" rows="3" required></textarea>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-danger" id="mark-unresolved">Mark Unresolved</button>
+                    <button type="button" class="btn btn-primary" id="submit-resolve">Resolve</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // Main JavaScript for Frontdesk AI Supervisor
+
+        document.addEventListener('DOMContentLoaded', function () {
+            // Check which page we're on
+            const isHelpRequestsPage = document.getElementById('requests-container') !== null;
+            const isKnowledgeBasePage = document.getElementById('knowledge-container') !== null;
+
+            // Initialize the appropriate page
+            if (isHelpRequestsPage) {
+                initializeHelpRequestsPage();
+            } else if (isKnowledgeBasePage) {
+                initializeKnowledgeBasePage();
+            }
+        });
+
+        // Help Requests Page Functions
+        function initializeHelpRequestsPage() {
+            // Initialize tab switching
+            document.querySelectorAll('#requestTabs .nav-link').forEach(tab => {
+                tab.addEventListener('click', function (e) {
+                    e.preventDefault();
+
+                    // Update active tab
+                    document.querySelectorAll('#requestTabs .nav-link').forEach(t => {
+                        t.classList.remove('active');
+                    });
+                    this.classList.add('active');
+
+                    // Fetch requests based on status
+                    const status = this.getAttribute('data-status');
+                    fetchHelpRequests(status);
+                });
+            });
+
+            // Initialize simulate call button
+            const simulateCallBtn = document.getElementById('simulate-call-btn');
+            if (simulateCallBtn) {
+                simulateCallBtn.addEventListener('click', function () {
+                    const modal = new bootstrap.Modal(document.getElementById('simulateCallModal'));
+
+                    // Reset the form
+                    document.getElementById('simulate-call-form').reset();
+                    document.getElementById('simulation-result').style.display = 'none';
+
+                    modal.show();
+                });
+            }
+
+            // Initialize simulate call submission
+            const submitSimulationBtn = document.getElementById('submit-simulation');
+            if (submitSimulationBtn) {
+                submitSimulationBtn.addEventListener('click', function () {
+                    const phone = document.getElementById('phone').value;
+                    const question = document.getElementById('question').value;
+
+                    // Send simulation request
+                    fetch('/api/simulate-call', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({ phone, question }),
+                    })
+                        .then(response => response.json())
+                        .then(data => {
+                            // Display result
+                            const resultDiv = document.getElementById('simulation-result');
+                            const messageDiv = document.getElementById('simulation-message');
+
+                            resultDiv.style.display = 'block';
+
+                            if (data.status === 'answered') {
+                                messageDiv.textContent = `The AI answered directly: "${data.answer}"`;
+                                messageDiv.className = 'alert alert-success';
+                            } else if (data.status === 'escalated') {
+                                messageDiv.textContent = `The question was escalated to supervisor. Request ID: ${data.request_id}`;
+                                messageDiv.className = 'alert alert-warning';
+
+                                // Refresh the requests list
+                                fetchHelpRequests('pending');
+                            }
+                        })
+                        .catch(error => {
+                            console.error('Error:', error);
+                            alert('An error occurred while simulating the call.');
+                        });
+                });
+            }
+
+            // Initialize resolve request modal events
+            document.getElementById('submit-resolve').addEventListener('click', function () {
+                const requestId = document.getElementById('resolve-request-id').value;
+                const answer = document.getElementById('answer').value;
+
+                if (!answer) {
+                    alert('Please provide an answer.');
+                    return;
+                }
+
+                // Send resolve request
+                fetch(`/api/help-requests/${requestId}/resolve`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ answer }),
+                })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success) {
+                            // Close the modal
+                            const modal = bootstrap.Modal.getInstance(document.getElementById('resolveRequestModal'));
+                            modal.hide();
+
+                            // Refresh the requests list
+                            const activeTab = document.querySelector('#requestTabs .nav-link.active');
+                            const status = activeTab.getAttribute('data-status');
+                            fetchHelpRequests(status);
+                        } else {
+                            alert('Failed to resolve request: ' + (data.error || 'Unknown error'));
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error:', error);
+                        alert('An error occurred while resolving the request.');
+                    });
+            });
+
+            // Initialize mark unresolved button
+            document.getElementById('mark-unresolved').addEventListener('click', function () {
+                const requestId = document.getElementById('resolve-request-id').value;
+
+                // Mark as unresolved
+                fetch(`/api/help-requests/${requestId}/unresolve`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({}),
+                })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success) {
+                            // Close the modal
+                            const modal = bootstrap.Modal.getInstance(document.getElementById('resolveRequestModal'));
+                            modal.hide();
+
+                            // Refresh the requests list
+                            const activeTab = document.querySelector('#requestTabs .nav-link.active');
+                            const status = activeTab.getAttribute('data-status');
+                            fetchHelpRequests(status);
+                        } else {
+                            alert('Failed to mark request as unresolved: ' + (data.error || 'Unknown error'));
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error:', error);
+                        alert('An error occurred while updating the request.');
+                    });
+            });
+
+            // Fetch initial help requests (pending by default)
+            fetchHelpRequests('pending');
+
+            // Poll for new requests every 10 seconds
+            setInterval(() => {
+                const activeTab = document.querySelector('#requestTabs .nav-link.active');
+                const status = activeTab.getAttribute('data-status');
+                fetchHelpRequests(status, true);
+            }, 10000);
+        }
+
+        function fetchHelpRequests(status = 'pending', silent = false) {
+            if (!silent) {
+                document.getElementById('loading').style.display = 'block';
+                document.getElementById('no-requests').style.display = 'none';
+                document.getElementById('requests-list').innerHTML = '';
+            }
+
+            const url = status === 'all' ? '/api/help-requests' : `/api/help-requests?status=${status}`;
+
+            fetch(url)
+                .then(response => response.json())
+                .then(requests => {
+                    if (!silent) {
+                        document.getElementById('loading').style.display = 'none';
+                    }
+
+                    if (requests.length === 0) {
+                        document.getElementById('no-requests').style.display = 'block';
+                        return;
+                    }
+
+                    // Only update the DOM if not silent or if the number of requests changed
+                    const currentCount = document.querySelectorAll('.request-card').length;
+                    if (!silent || currentCount !== requests.length) {
+                        renderHelpRequests(requests);
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    document.getElementById('loading').style.display = 'none';
+                    document.getElementById('no-requests').textContent = 'Failed to load help requests.';
+                    document.getElementById('no-requests').style.display = 'block';
+                });
+        }
+
+        function renderHelpRequests(requests) {
+            const container = document.getElementById('requests-list');
+            container.innerHTML = '';
+
+            requests.forEach(request => {
+                const card = document.createElement('div');
+                card.className = 'card request-card';
+
+                const isPending = request.status === 'pending';
+
+                // Format created date
+                const createdDate = new Date(request.created_at);
+                const formattedDate = createdDate.toLocaleString();
+
+                // Calculate time elapsed
+                const now = new Date();
+                const elapsed = Math.floor((now - createdDate) / (1000 * 60)); // minutes
+
+                let statusClass = '';
+                switch (request.status) {
+                    case 'pending':
+                        statusClass = 'status-pending';
+                        break;
+                    case 'resolved':
+                        statusClass = 'status-resolved';
+                        break;
+                    case 'unresolved':
+                        statusClass = 'status-unresolved';
+                        break;
+                }
+
+                card.innerHTML = `
+            <div class="card-header">
+                <span class="request-status ${statusClass}">${request.status}</span>
+                <span class="request-time">${formattedDate} (${elapsed} min ago)</span>
+            </div>
+            <div class="card-body">
+                <h5 class="card-title">From: ${request.customer_phone}</h5>
+                <p class="card-text"><strong>Question:</strong> ${request.question}</p>
+                ${request.answer ? `<p class="card-text"><strong>Answer:</strong> ${request.answer}</p>` : ''}
+                ${isPending ? `<button class="btn btn-primary btn-sm resolve-btn" data-id="${request.id}">Resolve</button>` : ''}
+            </div>
+        `;
+
+                container.appendChild(card);
+
+                // Add event listener to the resolve button
+                if (isPending) {
+                    const resolveBtn = card.querySelector('.resolve-btn');
+                    resolveBtn.addEventListener('click', function () {
+                        openResolveModal(request);
+                    });
+                }
+            });
+        }
+
+        function openResolveModal(request) {
+            const modal = new bootstrap.Modal(document.getElementById('resolveRequestModal'));
+
+            // Populate modal fields
+            document.getElementById('resolve-request-id').value = request.id;
+            document.getElementById('resolve-phone').textContent = request.customer_phone;
+            document.getElementById('resolve-question').textContent = request.question;
+            document.getElementById('answer').value = '';
+
+            modal.show();
+        }
+
+        // Knowledge Base Page Functions
+        function initializeKnowledgeBasePage() {
+            // Initialize add knowledge form submission
+            const submitKnowledgeBtn = document.getElementById('submit-knowledge');
+            if (submitKnowledgeBtn) {
+                submitKnowledgeBtn.addEventListener('click', function () {
+                    const question = document.getElementById('knowledge-question').value;
+                    const answer = document.getElementById('knowledge-answer').value;
+
+                    if (!question || !answer) {
+                        alert('Please fill out all fields.');
+                        return;
+                    }
+
+                    // Send add knowledge request
+                    fetch('/api/knowledge', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({ question, answer }),
+                    })
+                        .then(response => response.json())
+                        .then(data => {
+                            // Close the modal
+                            const modal = bootstrap.Modal.getInstance(document.getElementById('addKnowledgeModal'));
+                            modal.hide();
+
+                            // Reset the form
+                            document.getElementById('add-knowledge-form').reset();
+
+                            // Refresh the knowledge list
+                            fetchKnowledgeItems();
+                        })
+                        .catch(error => {
+                            console.error('Error:', error);
+                            alert('An error occurred while adding knowledge.');
+                        });
+                });
+            }
+
+            // Fetch initial knowledge items
+            fetchKnowledgeItems();
+        }
+
+        function fetchKnowledgeItems() {
+            document.getElementById('loading-knowledge').style.display = 'block';
+            document.getElementById('no-knowledge').style.display = 'none';
+            document.getElementById('knowledge-list').innerHTML = '';
+
+            fetch('/api/knowledge')
+                .then(response => response.json())
+                .then(items => {
+                    document.getElementById('loading-knowledge').style.display = 'none';
+
+                    if (items.length === 0) {
+                        document.getElementById('no-knowledge').style.display = 'block';
+                        return;
+                    }
+
+                    renderKnowledgeItems(items);
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    document.getElementById('loading-knowledge').style.display = 'none';
+                    document.getElementById('no-knowledge').textContent = 'Failed to load knowledge items.';
+                    document.getElementById('no-knowledge').style.display = 'block';
+                });
+        }
+
+        function renderKnowledgeItems(items) {
+            const container = document.getElementById('knowledge-list');
+            container.innerHTML = '';
+
+            items.forEach(item => {
+                const div = document.createElement('div');
+                div.className = 'knowledge-item';
+
+                // Format updated date
+                const updatedDate = new Date(item.last_updated);
+                const formattedDate = updatedDate.toLocaleString();
+
+                div.innerHTML = `
+            <div class="question">${item.question}</div>
+            <div class="answer">${item.answer}</div>
+            <div class="metadata">Last updated: ${formattedDate}</div>
+        `;
+
+                container.appendChild(div);
+            });
+        }
+    </script>
+</body>
+
+</html>
