@@ -23,7 +23,6 @@ frontdesk-ai-supervisor/
 │   ├── knowledge_base.py     # Knowledge management
 │   ├── routes.py             # API endpoints
 │   └── templates/            # HTML templates
-├── static/                   # Static assets (CSS, JS)
 ├── config.py                 # Configuration settings
 ├── requirements.txt          # Project dependencies
 └── run.py                    # Application entry point
